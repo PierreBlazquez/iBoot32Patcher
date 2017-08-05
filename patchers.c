@@ -69,6 +69,7 @@ int patch_boot_args(struct iboot_img* iboot_in, const char* boot_args) {
 	/* Patch out the conditional branches... */
 	void* _ldr_rd_boot_args = ldr_to(default_boot_args_xref);
 	if(!_ldr_rd_boot_args) {
+		printf("%s: Didn't find ldr to boot_args with first attempt\n", __FUNCTION__);
 		uintptr_t default_boot_args_str_loc_with_base = (uintptr_t) GET_IBOOT_FILE_OFFSET(iboot_in, default_boot_args_str_loc) + get_iboot_base_address(iboot_in->buf);
 
 		_ldr_rd_boot_args = find_next_LDR_insn_with_value(iboot_in, (uint32_t) default_boot_args_str_loc_with_base);

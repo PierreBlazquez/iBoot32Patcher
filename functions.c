@@ -27,6 +27,7 @@ void* bl_search_down(const void* start_addr, int len) {
 }
 
 void* find_last_LDR_rd(uintptr_t start, size_t len, const uint8_t rd) {
+	printf("%s: start: %p len: %zd rd: %d\n", __FUNCTION__, (void *)start, len, rd);
 	for(uintptr_t i = start; i > 0; i -= sizeof(uint16_t)) {
 		void* prev_ldr = pattern_search((void*) i, len, 0x00004800, 0x0000F800, -2);
 		struct arm32_thumb_LDR* ldr = (struct arm32_thumb_LDR*) prev_ldr;
@@ -37,6 +38,19 @@ void* find_last_LDR_rd(uintptr_t start, size_t len, const uint8_t rd) {
 			return (void*) prev_ldr;
 		}
 		i = ((uintptr_t) prev_ldr - sizeof(uint16_t));
+	}
+
+	for(uintptr_t i = start; i > 0; i -= sizeof(uint16_t)) {
+		void* prev_ldr32 = pattern_search((void*) i, len, 0x0000F8DF, 0x0000FFFF, -2);
+		struct arm32_thumb_LDR_T3* ldr32 = (struct arm32_thumb_LDR_T3*) prev_ldr32;
+		printf("%s: ldr32: %p rt: %d rn: %d\n", __FUNCTION__, ldr32, ldr32 ? ldr32->rt : -1, ldr32 ? ldr32->rn : -1);
+
+		if(ldr32 == NULL) {
+			break;
+		} else if(ldr32->rt == rd) {
+			return (void*) prev_ldr32;
+		}
+		i = ((uintptr_t) prev_ldr32 - sizeof(uint16_t));
 	}
 	return NULL;
 }
