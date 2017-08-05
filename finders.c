@@ -123,7 +123,7 @@ void* find_dtre_get_value_bl_insn(struct iboot_img* iboot_in, const char* var) {
 	printf("%s: \"%s\" xref is at %p\n", __FUNCTION__, var, (void*) GET_IBOOT_FILE_OFFSET(iboot_in, var_xref));
 
 	/* Locate corresponding LDR insn for xref... */
-	void* var_ldr = ldr_to(var_xref);
+	void* var_ldr = ldr_to(var_xref, NULL);
 	if(!var_ldr) {
 		printf("%s: Unable to find %s string LDR from xref!\n", __FUNCTION__, var);
 		return 0;

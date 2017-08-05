@@ -26,8 +26,8 @@ void* bl_search_down(const void* start_addr, int len) {
 	return pattern_search(start_addr, len, 0xD000F000, 0xD000F800, 1);
 }
 
-void* find_last_LDR_rd(uintptr_t start, size_t len, const uint8_t rd) {
-	printf("%s: start: %p len: %zd rd: %d\n", __FUNCTION__, (void *)start, len, rd);
+void* find_last_LDR_rd(uintptr_t start, size_t len, const uint8_t rd, bool *is32) {
+	//printf("%s: start: %p len: %zd rd: %d\n", __FUNCTION__, (void *)start, len, rd);
 	for(uintptr_t i = start; i > 0; i -= sizeof(uint16_t)) {
 		void* prev_ldr = pattern_search((void*) i, len, 0x00004800, 0x0000F800, -2);
 		struct arm32_thumb_LDR* ldr = (struct arm32_thumb_LDR*) prev_ldr;
@@ -43,7 +43,7 @@ void* find_last_LDR_rd(uintptr_t start, size_t len, const uint8_t rd) {
 	for(uintptr_t i = start; i > 0; i -= sizeof(uint16_t)) {
 		void* prev_ldr32 = pattern_search((void*) i, len, 0x0000F8DF, 0x0000FFFF, -2);
 		struct arm32_thumb_LDR_T3* ldr32 = (struct arm32_thumb_LDR_T3*) prev_ldr32;
-		printf("%s: ldr32: %p rt: %d rn: %d\n", __FUNCTION__, ldr32, ldr32 ? ldr32->rt : -1, ldr32 ? ldr32->rn : -1);
+		//printf("%s: ldr32: %p rt: %d rn: %d\n", __FUNCTION__, ldr32, ldr32 ? ldr32->rt : -1, ldr32 ? ldr32->rn : -1);
 
 		if(ldr32 == NULL) {
 			break;
@@ -82,7 +82,7 @@ void* find_next_LDR_insn_with_value(struct iboot_img* iboot_in, uint32_t value) 
 		printf("%s: Unable to find an LDR xref for 0x%X!\n", __FUNCTION__, value);
 		return 0;
 	}
-	void* ldr_insn = ldr_to(ldr_xref);
+	void* ldr_insn = ldr_to(ldr_xref, NULL);
 	if(!ldr_insn) {
 		printf("%s: Unable to resolve to LDR insn from xref %p!\n", __FUNCTION__, ldr_xref);
 		return 0;
@@ -191,7 +191,7 @@ void* ldr32_search_up(const void* start_addr, int len) {
 	return pattern_search(start_addr, len, 0x0000F8DF, 0x0000FFFF, -1);
 }
 
-void* ldr_to(const void* loc) {
+void* ldr_to(const void* loc, bool *is32) {
 	uintptr_t xref_target = (uintptr_t)loc;
 	uintptr_t i = xref_target;
 	uintptr_t min_addr = xref_target - 0x420;
@@ -204,6 +204,8 @@ void* ldr_to(const void* loc) {
 		uint32_t dw = *(uint32_t*)i;
 		uintptr_t ldr_target = ((i + 4) & ~3) + ((dw & 0xff) << 2);
 		if (ldr_target == xref_target) {
+			if (is32)
+				*is32 = false;
 			return (void*)i;
 		}
 	}
@@ -217,6 +219,8 @@ void* ldr_to(const void* loc) {
 		uint32_t dw = *(uint32_t*)i;
 		uintptr_t ldr_target = ((i + 4) & ~3) + ((dw >> 16) & 0xfff);
 		if (ldr_target == xref_target) {
+			if (is32)
+				*is32 = true;
 			return (void*)i;
 		}
 	}

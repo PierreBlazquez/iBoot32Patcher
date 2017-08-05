@@ -66,8 +66,10 @@ int patch_boot_args(struct iboot_img* iboot_in, const char* boot_args) {
 
 	/* This is where things get tricky... (Might run into issues on older loaders)*/
 
+	bool is32;
+
 	/* Patch out the conditional branches... */
-	void* _ldr_rd_boot_args = ldr_to(default_boot_args_xref);
+	void* _ldr_rd_boot_args = ldr_to(default_boot_args_xref, &is32);
 	if(!_ldr_rd_boot_args) {
 		printf("%s: Didn't find ldr to boot_args with first attempt\n", __FUNCTION__);
 		uintptr_t default_boot_args_str_loc_with_base = (uintptr_t) GET_IBOOT_FILE_OFFSET(iboot_in, default_boot_args_str_loc) + get_iboot_base_address(iboot_in->buf);
@@ -80,7 +82,10 @@ int patch_boot_args(struct iboot_img* iboot_in, const char* boot_args) {
 	}
 
 	struct arm32_thumb_LDR* ldr_rd_boot_args = (struct arm32_thumb_LDR*) _ldr_rd_boot_args;
-	printf("%s: Found LDR R%d, =boot_args at %p\n", __FUNCTION__, ldr_rd_boot_args->rd, GET_IBOOT_FILE_OFFSET(iboot_in, _ldr_rd_boot_args));
+	struct arm32_thumb_LDR_T3* ldr32_rd_boot_args = (struct arm32_thumb_LDR_T3*) _ldr_rd_boot_args;
+	int boot_args_rd = is32 ? ldr32_rd_boot_args->rt : ldr_rd_boot_args->rd;
+
+	printf("%s: Found LDR%s R%d, =boot_args at %p\n", __FUNCTION__, is32 ? "(32)" : "", boot_args_rd, GET_IBOOT_FILE_OFFSET(iboot_in, _ldr_rd_boot_args));
 
 	/* Find next CMP Rd, #0 instruction... */
 	void* _cmp_insn = find_next_CMP_insn_with_value(ldr_rd_boot_args, 0x100, 0);
@@ -91,40 +96,79 @@ int patch_boot_args(struct iboot_img* iboot_in, const char* boot_args) {
 
 	struct arm32_thumb* cmp_insn = (struct arm32_thumb*) _cmp_insn;
 	void* arm32_thumb_IT_insn = _cmp_insn;
+	int null_str_reg;
 
 	printf("%s: Found CMP R%d, #%d at %p\n", __FUNCTION__, cmp_insn->rd, cmp_insn->offset, GET_IBOOT_FILE_OFFSET(iboot_in, _cmp_insn));
 
 	/* Find the next IT EQ/IT NE instruction following the CMP Rd, #0 instruction... (kinda hacky) */
-	while(*(uint16_t*)arm32_thumb_IT_insn != ARM32_THUMB_IT_EQ && *(uint16_t*)arm32_thumb_IT_insn != ARM32_THUMB_IT_NE) {
-		arm32_thumb_IT_insn++;
+	while(*(uint16_t*)arm32_thumb_IT_insn != ARM32_THUMB_IT_EQ && *(uint16_t*)arm32_thumb_IT_insn != ARM32_THUMB_IT_NE
+		  && arm32_thumb_IT_insn != _cmp_insn + 0x100) {
+		arm32_thumb_IT_insn += 2;
 	}
 
-	printf("%s: Found IT EQ/IT NE at %p\n", __FUNCTION__, GET_IBOOT_FILE_OFFSET(iboot_in, arm32_thumb_IT_insn));
+	if (arm32_thumb_IT_insn != _cmp_insn + 0x100) {
+		printf("%s: Found IT EQ/IT NE at %p\n", __FUNCTION__, GET_IBOOT_FILE_OFFSET(iboot_in, arm32_thumb_IT_insn));
 
-	/* MOV Rd, Rs instruction usually follows right after the IT instruction. */
-	struct arm32_thumb_hi_reg_op* mov_insn = (struct arm32_thumb_hi_reg_op*) (arm32_thumb_IT_insn + 2);
+		/* MOV Rd, Rs instruction usually follows right after the IT instruction. */
+		struct arm32_thumb_hi_reg_op* mov_insn = (struct arm32_thumb_hi_reg_op*) (arm32_thumb_IT_insn + 2);
 
-	printf("%s: Found MOV R%d, R%d at %p\n", __FUNCTION__, mov_insn->rd, mov_insn->rs, GET_IBOOT_FILE_OFFSET(iboot_in, arm32_thumb_IT_insn + 2));
+		printf("%s: Found MOV R%d, R%d at %p\n", __FUNCTION__, mov_insn->rd, mov_insn->rs, GET_IBOOT_FILE_OFFSET(iboot_in, arm32_thumb_IT_insn + 2));
 
-	/* Find the last LDR Rd which holds the null string pointer... */
-	int null_str_reg = (ldr_rd_boot_args->rd == mov_insn->rs) ? mov_insn->rd : mov_insn->rs;
+		/* Find the last LDR Rd which holds the null string pointer... */
+		null_str_reg = (boot_args_rd == mov_insn->rs) ? mov_insn->rd : mov_insn->rs;
+	} else {
+		printf("%s: Unable to find IT EQ/IT NE, looking for ITE EQ/ITE NE\n", __FUNCTION__);
+		void* arm32_thumb_ITE_insn = _cmp_insn;
+		/* Find the next ITE EQ/ITE NE instruction following the CMP Rd, #0 instruction... (kinda hacky) */
+		while(*(uint16_t*)arm32_thumb_ITE_insn != ARM32_THUMB_ITE_EQ && *(uint16_t*)arm32_thumb_ITE_insn != ARM32_THUMB_ITE_NE
+			  && arm32_thumb_ITE_insn != _cmp_insn + 0x100) {
+			arm32_thumb_ITE_insn += 2;
+		}
+
+		if (arm32_thumb_ITE_insn == _cmp_insn + 0x100) {
+			printf("%s: Unable to find ITE EQ/IT NE\n", __FUNCTION__);
+			return 0;
+		}
+
+		printf("%s: Found ITE EQ/IT NE at %p\n", __FUNCTION__, GET_IBOOT_FILE_OFFSET(iboot_in, arm32_thumb_ITE_insn));
+
+		/* MOV Rd, Rs instruction usually follows right after the IT instruction. */
+		struct arm32_thumb_hi_reg_op* mov_insn_first = (struct arm32_thumb_hi_reg_op*) (arm32_thumb_ITE_insn + 2);
+		struct arm32_thumb_hi_reg_op* mov_insn_second = (struct arm32_thumb_hi_reg_op*) (arm32_thumb_ITE_insn + 4);
+		if (boot_args_rd == mov_insn_first->rs) {
+			null_str_reg = mov_insn_second->rs;
+		} else if (boot_args_rd == mov_insn_second->rs) {
+			null_str_reg = mov_insn_first->rs;
+		} else {
+			printf("%s: Unable to find boot_args R%d in ITE EQ/IT NE at %p\n", __FUNCTION__, boot_args_rd, GET_IBOOT_FILE_OFFSET(iboot_in, arm32_thumb_ITE_insn));
+			return 0;
+		}
+	}
 
 	/* + 0x10: Some iBoots have the null string load after the CMP instruction... */
-	void* ldr_null_str = find_last_LDR_rd((uintptr_t) (_cmp_insn + 0x10), 0x200, null_str_reg);
+	void* ldr_null_str = find_last_LDR_rd((uintptr_t) (_cmp_insn + 0x10), 0x200, null_str_reg, &is32);
 	if(!ldr_null_str) {
 		printf("%s: Unable to find LDR R%d, =null_str\n", __FUNCTION__, null_str_reg);
 		return 0;
 	}
 
-	printf("%s: Found LDR R%d, =null_str at %p\n", __FUNCTION__, null_str_reg, GET_IBOOT_FILE_OFFSET(iboot_in, ldr_null_str));
+	printf("%s: Found LDR%s R%d, =null_str at %p\n", __FUNCTION__, is32 ? "(32)" : "", null_str_reg, GET_IBOOT_FILE_OFFSET(iboot_in, ldr_null_str));
 
 	/* Calculate the new PC relative load from the default boot args xref to the LDR Rd, =null_string location. */
 	uint32_t diff = (uint32_t) (GET_IBOOT_FILE_OFFSET(iboot_in, default_boot_args_xref) - GET_IBOOT_FILE_OFFSET(iboot_in, ldr_null_str));
 
-	/* T1 LDR PC-based instructions use the immediate 8 bits multiplied by 4. */
-	struct arm32_thumb_LDR* ldr_rd_null_str = (struct arm32_thumb_LDR*) ldr_null_str;
-	printf("%s: Pointing LDR R%d, =null_str to boot-args xref...\n", __FUNCTION__, ldr_rd_null_str->rd);
-	ldr_rd_null_str->imm8 = (diff / 0x4);
+	if (!is32) {
+		/* T1 LDR PC-based instructions use the immediate 8 bits multiplied by 4. */
+		struct arm32_thumb_LDR* ldr_rd_null_str = (struct arm32_thumb_LDR*) ldr_null_str;
+		ldr_rd_null_str->imm8 = (diff / 0x4);
+		printf("%s: Pointing LDR R%d, =null_str to boot-args xref...\n", __FUNCTION__, ldr_rd_null_str->rd);
+	} else {
+		diff -= 4;
+		/* T3 LDR PC-based instructions use unscaled 12 bit immediates. */
+		struct arm32_thumb_LDR_T3* ldr32_rd_null_str = (struct arm32_thumb_LDR_T3*) ldr_null_str;
+		ldr32_rd_null_str->imm12 = diff;
+		printf("%s: Pointing LDR(32) R%d, =null_str to boot-args xref...\n", __FUNCTION__, ldr32_rd_null_str->rt);
+	}
 
 	printf("%s: Leaving...\n", __FUNCTION__);
 	return 1;
