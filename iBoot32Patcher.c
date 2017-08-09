@@ -51,9 +51,8 @@ int main(int argc, char** argv) {
 	uint32_t cmd_handler_ptr = 0;
 	char* cmd_handler_str = NULL;
 	char* custom_boot_args = NULL;
-	struct iboot_img iboot_in;
-
-	memset(&iboot_in, 0, sizeof(iboot_in));
+	uint8_t *binary;
+	ssize_t binary_len;
 
 	if(argc < 3) {
 		printf("Usage: %s <iboot_in> <iboot_out> [args]\n", argv[0]);
@@ -80,80 +79,23 @@ int main(int argc, char** argv) {
 	}
 
 	fseek(fp, 0, SEEK_END);
-	iboot_in.len = ftell(fp);
+	binary_len = ftell(fp);
 	fseek(fp, 0, SEEK_SET);
 
-	iboot_in.buf = (void*)malloc(iboot_in.len);
-	if(!iboot_in.buf) {
+	binary = (void*)malloc(binary_len);
+	if(!binary) {
 		printf("%s: Out of memory!\n", __FUNCTION__);
 		fclose(fp);
 		return -1;
 	}
 	
-	fread(iboot_in.buf, 1, iboot_in.len, fp);
+	fread(binary, 1, binary_len, fp);
 	fclose(fp);
-	
-	uint32_t image_magic = *(uint32_t*)iboot_in.buf;
-	
-	if(image_magic == IMAGE3_MAGIC) {
-		printf("%s: The supplied image appears to be in an img3 container. Please ensure that the image is decrypted and that the img3 header is stripped.\n", __FUNCTION__);
-		free(iboot_in.buf);
-		return -1;
-	}
 
-	if(image_magic != IBOOT32_RESET_VECTOR_BYTES) {
-		printf("%s: The supplied image is not a valid 32-bit iBoot.\n", __FUNCTION__);
-		free(iboot_in.buf);
-		return -1;
-	}
+	ret = patchIBoot32(binary, binary_len, custom_boot_args, cmd_handler_str, cmd_handler_ptr);
 
-	const char* iboot_vers_str = (iboot_in.buf + IBOOT_VERS_STR_OFFSET);
-
-	iboot_in.VERS = atoi(iboot_vers_str);
-	if(!iboot_in.VERS) {
-		printf("%s: No iBoot version found!\n", __FUNCTION__);
-		free(iboot_in.buf);
-		return -1;
-	}
-
-	printf("%s: iBoot-%d inputted.\n", __FUNCTION__, iboot_in.VERS);
-	
-	/* Check to see if the loader has a kernel load routine before trying to apply custom boot args + debug-enabled override. */
-	if(has_kernel_load(&iboot_in)) {
-		if(custom_boot_args) {
-			ret = patch_boot_args(&iboot_in, custom_boot_args);
-			if(!ret) {
-				printf("%s: Error doing patch_boot_args()!\n", __FUNCTION__);
-				free(iboot_in.buf);
-				return -1;
-			}
-		}
-
-		/* Only bootloaders with the kernel load routines pass the DeviceTree. */
-		ret = patch_debug_enabled(&iboot_in);
-		if(!ret) {
-			printf("%s: Error doing patch_debug_enabled()!\n", __FUNCTION__);
-			free(iboot_in.buf);
-			return -1;
-		}
-	}
-
-	/* Ensure that the loader has a shell. */
-	if(has_recovery_console(&iboot_in) && cmd_handler_str) {
-		ret = patch_cmd_handler(&iboot_in, cmd_handler_str, cmd_handler_ptr);
-		if(!ret) {
-			printf("%s: Error doing patch_cmd_handler()!\n", __FUNCTION__);
-			free(iboot_in.buf);
-			return -1;
-		}
-	}
-
-	/* All loaders have the RSA check. */
-	ret = patch_rsa_check(&iboot_in);
-	if(!ret) {
-		printf("%s: Error doing patch_rsa_check()!\n", __FUNCTION__);
-		free(iboot_in.buf);
-		return -1;
+	if (ret < 0) {
+		printf("%s: Uh-oh, patchIBoot32 had a problem... (%d)\n", __FUNCTION__, ret);
 	}
 
 	printf("%s: Writing out patched file to %s...\n", __FUNCTION__, argv[2]);
@@ -162,15 +104,15 @@ int main(int argc, char** argv) {
 	fp = fopen(argv[2], "wb+");
 	if(!fp) {
 		printf("%s: Unable to open %s!\n", __FUNCTION__, argv[2]);
-		free(iboot_in.buf);
+		free(binary);
 		return -1;
 	}
 
-	fwrite(iboot_in.buf, 1, iboot_in.len, fp);
+	fwrite(binary, 1, binary_len, fp);
 	fflush(fp);
 	fclose(fp);
 
-	free(iboot_in.buf);
+	free(binary);
 
 	printf("%s: Quitting...\n", __FUNCTION__);
 	return 0;

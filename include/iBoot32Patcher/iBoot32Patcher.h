@@ -70,4 +70,8 @@ const static struct iboot_interval iboot_intervals[] = {
 
 uint32_t get_iboot_base_address(void* iboot_buf);
 
+int patchIBoot32(uint8_t *binary, ssize_t binary_len,
+	const char *custom_boot_args, const char *cmd_handler_str,
+	uint32_t cmd_handler_ptr);
+
 #endif
