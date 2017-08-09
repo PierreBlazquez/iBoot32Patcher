@@ -20,7 +20,7 @@
 #ifndef FINDERS_H
 #define FINDERS_H
 
-#include <include/iBoot32Patcher.h>
+#include "iBoot32Patcher/iBoot32Patcher.h"
 
 void* find_bl_verify_shsh(struct iboot_img* iboot_in);
 void* find_bl_verify_shsh_5_6_7(struct iboot_img* iboot_in);

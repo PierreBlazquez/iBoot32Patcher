@@ -19,9 +19,9 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <include/finders.h>
-#include <include/functions.h>
-#include <include/iBoot32Patcher.h>
+#include "iBoot32Patcher/finders.h"
+#include "iBoot32Patcher/functions.h"
+#include "iBoot32Patcher/iBoot32Patcher.h"
 
 void* find_bl_verify_shsh(struct iboot_img* iboot_in) {
 	int os_vers = get_os_version(iboot_in);

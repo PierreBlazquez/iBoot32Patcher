@@ -19,10 +19,10 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <include/finders.h>
-#include <include/functions.h>
-#include <include/patchers.h>
-#include <include/iBoot32Patcher.h>
+#include "iBoot32Patcher/finders.h"
+#include "iBoot32Patcher/functions.h"
+#include "iBoot32Patcher/patchers.h"
+#include "iBoot32Patcher/iBoot32Patcher.h"
 
 int patch_boot_args(struct iboot_img* iboot_in, const char* boot_args) {
 	printf("%s: Entering...\n", __FUNCTION__);

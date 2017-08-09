@@ -20,7 +20,7 @@
 #ifndef PATCHERS_H
 #define PATCHERS_H
 
-#include <include/iBoot32Patcher.h>
+#include "iBoot32Patcher/iBoot32Patcher.h"
 
 #define DEBUG_ENABLED_DTRE_VAR_STR "debug-enabled"
 #define DEFAULT_BOOTARGS_STR "rd=md0 nand-enable-reformat=1 -progress"

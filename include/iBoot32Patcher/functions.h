@@ -20,8 +20,8 @@
 #ifndef FUNCTIONS_H
 #define FUNCTIONS_H
 
-#include <include/arm32_defs.h>
-#include <include/iBoot32Patcher.h>
+#include "iBoot32Patcher/arm32_defs.h"
+#include "iBoot32Patcher/iBoot32Patcher.h"
 
 #define ENTERING_RECOVERY_CONSOLE "Entering recovery mode, starting command prompt"
 #define KERNELCACHE_PREP_STRING "__PAGEZERO"

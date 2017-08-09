@@ -19,8 +19,8 @@
 
 #include <stdio.h>
 #include <stdint.h>
-#include <include/functions.h>
-#include <include/iBoot32Patcher.h>
+#include "iBoot32Patcher/functions.h"
+#include "iBoot32Patcher/iBoot32Patcher.h"
 
 void* bl_search_down(const void* start_addr, int len) {
 	return pattern_search(start_addr, len, 0xD000F000, 0xD000F800, 1);
@@ -35,6 +35,8 @@ void* find_last_LDR_rd(uintptr_t start, size_t len, const uint8_t rd, bool *is32
 		if(ldr == NULL) {
 			break;
 		} else if(ldr->rd == rd) {
+			if (is32)
+				*is32 = false;
 			return (void*) prev_ldr;
 		}
 		i = ((uintptr_t) prev_ldr - sizeof(uint16_t));
@@ -48,6 +50,8 @@ void* find_last_LDR_rd(uintptr_t start, size_t len, const uint8_t rd, bool *is32
 		if(ldr32 == NULL) {
 			break;
 		} else if(ldr32->rt == rd) {
+			if (is32)
+				*is32 = true;
 			return (void*) prev_ldr32;
 		}
 		i = ((uintptr_t) prev_ldr32 - sizeof(uint16_t));
