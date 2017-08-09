@@ -17,6 +17,7 @@
  * along with iBoot32Patcher.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -41,6 +42,12 @@ int patchIBoot32(uint8_t *binary, ssize_t binary_len,
 	iboot_in.buf = binary;
 	if(!iboot_in.buf) {
 		printf("%s: binary is NULL!\n", __FUNCTION__);
+		return -1;
+	}
+
+	iboot_in.len = binary_len;
+	if(!iboot_in.len) {
+		printf("%s: binary is has 0 length!\n", __FUNCTION__);
 		return -1;
 	}
 

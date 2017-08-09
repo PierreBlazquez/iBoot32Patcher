@@ -22,7 +22,7 @@
  * Universal 32-bit iBoot patcher for iPhone OS 2.0 --> iOS 10
  *
  * Build:
- * clang iBoot32Patcher.c finders.c functions.c patchers.c -Wno-multichar -I. -o iBoot32Patcher
+ * The cmakes.
  *
  * Usage:
  * ./iBoot32Patcher iBoot.n49.RELEASE.dfu.decrypted iBoot.n49.RELEASE.dfu.patched
@@ -37,11 +37,7 @@
 #include <string.h>
 #include <stdint.h>
 
-#include "iBoot32Patcher/arm32_defs.h"
-#include "iBoot32Patcher/finders.h"
-#include "iBoot32Patcher/functions.h"
 #include "iBoot32Patcher/iBoot32Patcher.h"
-#include "iBoot32Patcher/patchers.h"
 
 #define HAS_ARG(x,y) (!strcmp(argv[i], x) && (i + y) < argc)
 
