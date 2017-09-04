@@ -28,9 +28,14 @@
 #include "iBoot32Patcher/iBoot32Patcher.h"
 #include "iBoot32Patcher/patchers.h"
 
-int patchIBoot32(uint8_t *binary, ssize_t binary_len,
-	const char *custom_boot_args, const char *cmd_handler_str,
-	uint32_t cmd_handler_ptr) {
+int patchIBoot32(uint8_t *binary,
+                 ssize_t binary_len,
+                const char *custom_boot_args,
+                 const char *cmd_handler_str,
+                 uint32_t cmd_handler_ptr,
+                 /* PBLA: New lite patching argument - BEGIN ADD */
+                 bool lite_patching
+                 /* PBLA: New lite patching argument - END ADD */) {
 
 	int ret = 0;
 	struct iboot_img iboot_in;
@@ -72,33 +77,41 @@ int patchIBoot32(uint8_t *binary, ssize_t binary_len,
 	}
 
 	printf("%s: iBoot-%d inputted.\n", __FUNCTION__, iboot_in.VERS);
-	
-	/* Check to see if the loader has a kernel load routine before trying to apply custom boot args + debug-enabled override. */
-	if(has_kernel_load(&iboot_in)) {
-		if(custom_boot_args) {
-			ret = patch_boot_args(&iboot_in, custom_boot_args);
-			if(!ret) {
-				printf("%s: Error doing patch_boot_args()!\n", __FUNCTION__);
-				return -1;
-			}
-		}
-
-		/* Only bootloaders with the kernel load routines pass the DeviceTree. */
-		ret = patch_debug_enabled(&iboot_in);
-		if(!ret) {
-			printf("%s: Error doing patch_debug_enabled()!\n", __FUNCTION__);
-			return -1;
-		}
-	}
-
-	/* Ensure that the loader has a shell. */
-	if(has_recovery_console(&iboot_in) && cmd_handler_str) {
-		ret = patch_cmd_handler(&iboot_in, cmd_handler_str, cmd_handler_ptr);
-		if(!ret) {
-			printf("%s: Error doing patch_cmd_handler()!\n", __FUNCTION__);
-			return -1;
-		}
-	}
+    
+    /* PBLA: New lite patching argument - BEGIN MODIFY */
+    if (!lite_patching) {
+        printf("%s: /!\\ Full patching will be applied to iBoot-%d.\n", __FUNCTION__, iboot_in.VERS);
+        
+        /* Check to see if the loader has a kernel load routine before trying to apply custom boot args + debug-enabled override. */
+        if(has_kernel_load(&iboot_in)) {
+            if(custom_boot_args) {
+                ret = patch_boot_args(&iboot_in, custom_boot_args);
+                if(!ret) {
+                    printf("%s: Error doing patch_boot_args()!\n", __FUNCTION__);
+                    return -1;
+                }
+            }
+            
+            /* Only bootloaders with the kernel load routines pass the DeviceTree. */
+            ret = patch_debug_enabled(&iboot_in);
+            if(!ret) {
+                printf("%s: Error doing patch_debug_enabled()!\n", __FUNCTION__);
+                return -1;
+            }
+        }
+        
+        /* Ensure that the loader has a shell. */
+        if(has_recovery_console(&iboot_in) && cmd_handler_str) {
+            ret = patch_cmd_handler(&iboot_in, cmd_handler_str, cmd_handler_ptr);
+            if(!ret) {
+                printf("%s: Error doing patch_cmd_handler()!\n", __FUNCTION__);
+                return -1;
+            }
+        }
+    } else {
+        printf("%s: /!\\ Lite-patching iBoot-%d. Some patches will be ommited.\n", __FUNCTION__, iboot_in.VERS);
+    }
+    /* PBLA: New lite patching argument - END MODIFY */
 
 	/* All loaders have the RSA check. */
 	ret = patch_rsa_check(&iboot_in);

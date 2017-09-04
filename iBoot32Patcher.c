@@ -42,18 +42,24 @@
 #define HAS_ARG(x,y) (!strcmp(argv[i], x) && (i + y) < argc)
 
 int main(int argc, char** argv) {
-	int ret = 0;
-	FILE* fp = NULL;
-	uint32_t cmd_handler_ptr = 0;
-	char* cmd_handler_str = NULL;
-	char* custom_boot_args = NULL;
-	uint8_t *binary;
-	ssize_t binary_len;
+	int         ret = 0;
+	FILE        *fp = NULL;
+	uint32_t    cmd_handler_ptr = 0;
+	char        *cmd_handler_str = NULL;
+	char        *custom_boot_args = NULL;
+    /* PBLA: New lite patching argument - BEGIN ADD */
+    bool        lite_patching = false;
+    /* PBLA: New lite patching argument - END ADD */
+	uint8_t     *binary;
+	ssize_t     binary_len;
+    
+    clear_screen();
 
 	if(argc < 3) {
 		printf("Usage: %s <iboot_in> <iboot_out> [args]\n", argv[0]);
 		printf("\t-b <str>\tApply custom boot args.\n");
 		printf("\t-c <cmd> <ptr>\tChange a command handler's pointer (hex).\n");
+        printf("\t-l\t\tLite patching (only RSA), optional.\n");
 		return -1;
 	}
 
@@ -65,7 +71,12 @@ int main(int argc, char** argv) {
 		} else if(HAS_ARG("-c", 2)) {
 			cmd_handler_str = (char*) argv[i+1];
 			sscanf((char*) argv[i+2], "0x%08X", &cmd_handler_ptr);
-		}
+        }
+        /* PBLA: New lite patching argument - BEGIN ADD */
+        else if (HAS_ARG("-l", 0)) {
+            lite_patching = true;
+        }
+        /* PBLA: New lite patching argument - END ADD */
 	}
 
 	fp = fopen(argv[1], "rb");
@@ -88,7 +99,10 @@ int main(int argc, char** argv) {
 	fread(binary, 1, binary_len, fp);
 	fclose(fp);
 
-	ret = patchIBoot32(binary, binary_len, custom_boot_args, cmd_handler_str, cmd_handler_ptr);
+    /* PBLA: New lite patching argument - BEGIN MODIFY */
+    ret = patchIBoot32(binary, binary_len, custom_boot_args, cmd_handler_str, cmd_handler_ptr, lite_patching);
+    //ret = patchIBoot32(binary, binary_len, custom_boot_args, cmd_handler_str, cmd_handler_ptr);
+    /* PBLA: New lite patching argument - END MODIFY */
 
 	if (ret < 0) {
 		printf("%s: Uh-oh, patchIBoot32 had a problem... (%d)\n", __FUNCTION__, ret);

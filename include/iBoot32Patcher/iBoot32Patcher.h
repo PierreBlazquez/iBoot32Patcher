@@ -24,6 +24,14 @@
 #include <stdbool.h>
 #include <string.h>
 
+/* PBLA: Clear screen a little - BEGIN ADD */
+#ifdef _WIN32
+#define clear_screen() system("cls");
+#else
+#define clear_screen() system("clear");
+#endif
+/* PBLA: Clear screen a little - END ADD */
+
 #define bswap32 __builtin_bswap32
 #define bswap16 __builtin_bswap16
 
@@ -59,7 +67,10 @@ struct iboot_interval {
 const static struct iboot_interval iboot_intervals[] = {
 	{320, 590, 2},
 	{594, 817, 3},
-	{889, 1072, 4},
+    /* PBLA: iOS 4 had older (kinda known) iBoot versions - BEGIN REPLACE */
+    //{889, 1072, 4},
+    {822, 1072, 4},
+    /* PBLA: iOS 4 had older (kinda known) iBoot versions - END REPLACE */
 	{1218, 1220, 5},
 	{1537, 1537, 6},
 	{1940, 1940, 7},
@@ -70,8 +81,14 @@ const static struct iboot_interval iboot_intervals[] = {
 
 uint32_t get_iboot_base_address(void* iboot_buf);
 
-int patchIBoot32(uint8_t *binary, ssize_t binary_len,
-	const char *custom_boot_args, const char *cmd_handler_str,
-	uint32_t cmd_handler_ptr);
+int patchIBoot32(uint8_t *binary,
+                 ssize_t binary_len,
+                 const char *custom_boot_args,
+                 const char *cmd_handler_str,
+                 uint32_t cmd_handler_ptr,
+                 /* PBLA: New lite patching argument - BEGIN ADD */
+                 bool lite_patching
+                 /* PBLA: New lite patching argument - END ADD */
+);
 
 #endif
